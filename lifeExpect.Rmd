@@ -1,0 +1,91 @@
+---
+title: "Life Expectancy Analysis"
+author: "Elizabeth Mitchell"
+date: "11/6/2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+We want to use this data to analyze if the economic well being of a country has a relationship with the life expectancies of the citizens of the country. We can create a statistical model of the realtionship between these variables. The model will define a way to describe the relationship, for example we will know how much we expect life exoectancies to increase with an increase in economic well being. Additionally we will be able to predict life expectancy given the economic well being of a country.
+
+
+```{r}
+library(ggplot2)
+library(car)
+library(MASS)
+
+lifeExpect <- read.csv("LifeExp.txt", head = T, sep = " ")
+head(lifeExpect)
+
+lifeExpect$Group <- relevel(lifeExpect$Group, ref = "other")
+
+ggplot(data=lifeExpect, mapping=aes(x=log(PPGDP), y=LifeExp, color = Group)) + geom_point()
+```
+Based on the scatterplot of life expectancy compared to the log of PPGDP, we need to include an interaction in the model because each of the three groups follows a different line. This shows that the group that a country is in changes how the PPGDP affects life expectancy. Therefore we will include an interaction between log(PPGDP) and Group in our model.
+
+The model we will use is $y_{i} = \beta_{0} + \beta_{1}x_{i1} + \beta_{2}x_{i2} + \beta_{3}x_{i3} + \beta_{4}x_{i1}x_{i2} + \beta_{5}x_{i1}x_{i3}  +\varepsilon_{i}$ 
+
+$\varepsilon$ ~ $N(0, \sigma^{2})$
+
+$\beta_{0}$ is the life expectancy if log(PPGDP) is 0 and the group is "Other."
+$\beta_{1}$ is how much the life expectancy of a country will increase if all else is held constant and the log(PPGDP) goes up by one.
+$\beta_{2}$ is how much the the life expectancy of a country will increase if all else is held constant and the group is OECD.
+$\beta_{3}$ is how much the the life expectancy of a country will increase if all else is held constant and the group is Africa. 
+$\beta_{4}$ is how much the life expectancy will go up if the log(PPGDP) increases by one and the group is OECD.
+$\beta_{5}$ is how much the life expectancy will go up if the log(PPGDP) increases by one and the group is Africa.
+$y_{i}$ is an individual estimate of the life expectancy.
+$x_{i1}$ is the an individual point of log(PPGDP).
+$x_{i2}$ is whether or not the group is OECD.
+$x_{i3}$ is whether or not the group is Africa.
+$\varepsilon_{i}$ is the error term and it is normally distributed.
+
+By using this model we are assuming that there is a linear relationship, the data is independent, the residuals have a normal distribution and that there is equal variance.
+
+```{r}
+lifeExp_model <- lm(LifeExp ~ log(PPGDP) + Group + log(PPGDP):Group, data = lifeExpect)
+summary(lifeExp_model)
+```
+The fitted model for this data is 
+$y_{i} = 50.424 + 2.939x_{i1} + -11.895x_{i2} + 11.292x_{i3} + -.041x_{i1}x_{i2} + -.953x_{i1}x_{i3}  +\varepsilon_{i}$
+
+```{r}
+ggplot(data=lifeExpect, mapping=aes(x=log(PPGDP), y=LifeExp, color = Group)) + geom_point() + geom_smooth(method="lm", se=FALSE) 
+```
+
+This model fits really well with an $R^{2}$ value of .987. This means that the model accounts for 98.7% of the variation in the distance from the points to the line that best fits them.
+
+The assumption of linearity is met as we can see in the above scatterplot. The independence assumption is debatable, I would have to talk to an expert to know how one country is affected by another. For the time being we will assume independence. The assumption of normality is met as we can see in the histogram of the standardized residuals as shown below. Equal variance is also met as we can se from the plot of fitted values vs. residuals below. 
+```{r}
+hist(stdres(lifeExp_model))
+
+plot(lifeExp_model$fitted.values, stdres(lifeExp_model))
+
+```
+
+The p-value for the overall F-test for the model is < 2.2e-16 so we can conclude that at least one of the factors included (PPGDP and Group) has a significant relationship with a country's life expectancy.
+
+```{r}
+confint(lifeExp_model)
+```
+The 95% confidence interval for the intercept is (49.0171145, 51.8309469).
+
+The 95% confidence interval for the slope of log(PPGDP) is (2.7772377, 3.1003980). This means that when all else is held constant we are 95% confident that as the log(PPGDP) increases by one on average a country's life expectancy will increase by between 2.78 and 3.1.
+
+The 95% confidence interval for the slope of the group Africa is (-14.8068732, -8.9833514).
+
+The 95% confidence interval for the slope of the group OECD is ( 4.9500705, 17.6339585).
+
+The 95% confidence interval for the interaction of log(PPGDP) and group Africa is (-0.4606503, 0.3780884). 
+
+The 95% confidence interval for the interaction of log(PPGDP) and group OECD is (-1.5700033, -0.3353494).This means we are 95% confident that as the log(PPGDP) increases by one if the country is part of group OECD on average a country's life expectancy will decrease between 1.57 and .34. 
+
+The data support that as a country's GDP increases the life expectancy also increases since as the log of PPGDP increases since the confidence interval of the slope (2.7772377, 3.1003980) is positive, as log(PPGDP) increases so does life expectancy. However, since the interaction between log of PPGDP and the group OECD only contains negative values in the 95% confidence interval, if a country is in the OECD then as their PPGDP increases on average their life expectancy decreases (slightly.) To summarize, the data does support the economists claim but only conditionally.
+
+```{r}
+reduced_model <- lm(LifeExp ~ log(PPGDP) + Group, data = lifeExpect)
+anova(lifeExp_model, reduced_model)
+```
+
+The F test for the interaction between log(PPGDP) and Group has a p-value of .01083 indicating that the interaction is indeed significant. This confirms our interpretation that the way that an increase in PPGDP influences a country's average life expectancy is affected by which group the country belongs to.
